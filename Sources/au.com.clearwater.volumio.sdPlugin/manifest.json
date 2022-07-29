@@ -1,0 +1,74 @@
+{
+  "Actions": [
+    {
+      "Icon": "volumeDown", 
+      "Name": "volumedown", 
+      "States": [
+        {
+          "Image": "volumeDown",
+          "TitleAlignment": "middle", 
+          "FontSize": "16"
+        }
+      ], 
+      "SupportedInMultiActions": false,
+      "Tooltip": "Volume Down", 
+      "UUID": "au.com.clearwater.volumio.volumedown"
+    },
+    {
+      "Icon": "play",
+      "Name": "playpause", 
+      "States": [
+        {
+          "Image": "play",
+          "TitleAlignment": "middle", 
+          "FontSize": "16"
+        },
+        {
+          "Image": "pause",
+          "TitleAlignment": "middle", 
+          "FontSize": "16"
+        }
+      ], 
+      "SupportedInMultiActions": false,
+      "Tooltip": "Play/Pause Toggle", 
+      "UUID": "au.com.clearwater.volumio.playpause"
+    },
+    {
+      "Icon": "volumeUp", 
+      "Name": "volumeup", 
+      "States": [
+        {
+          "Image": "volumeUp",
+          "TitleAlignment": "middle", 
+          "FontSize": "16"
+        }
+      ], 
+      "SupportedInMultiActions": false,
+      "Tooltip": "Volume Up", 
+      "UUID": "au.com.clearwater.volumio.volumeup"
+    }
+  ], 
+  "SDKVersion": 2,
+  "Author": "Clearwater Software", 
+  "CodePath": "main.js", 
+  "PropertyInspectorPath": "property_inspector.html",
+  "Description": "Volumio Control.", 
+  "Name": "Volumio",
+  "Icon": "volumioIcon", 
+  "URL": "https://www.clearwater.com.au", 
+  "Version": "1.0",
+  "OS": [
+    {
+        "Platform": "mac", 
+        "MinimumVersion" : "10.11"
+    },
+    {
+        "Platform": "windows", 
+        "MinimumVersion" : "10"
+    }
+  ],
+  "Software": 
+    {
+        "MinimumVersion" : "4.1"
+    }
+}

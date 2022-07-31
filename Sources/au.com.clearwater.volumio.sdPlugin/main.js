@@ -2,6 +2,9 @@
 
 var WS = require('ws');
 var io=require('socket.io-client');  // IMPORTANT: old version of socket.io  "socket.io-client": "^1.7.4"
+var jimp=require('jimp');
+var resolveRelative = require('resolve-relative-url');
+
 var { exec } = require('child_process');
 const { defaultMaxListeners } = require('events');
 var myArgs = process.argv.slice(2);
@@ -12,6 +15,7 @@ var ws;
 var wsClient;
 var debug = false;
 var logging = true;
+const timers = {}
 
 if (logging) {
     var fs = require('fs');
@@ -60,6 +64,7 @@ var DestinationEnum = Object.freeze({
 });
 var volumioHostName = undefined; // eg "Nuonic VPN"
 var volumioState = undefined;
+var volumioAlbumArt = undefined;
 
 function showAlert(context) {
     var json = {
@@ -83,7 +88,27 @@ function setState(context, state) {
     ws.send(JSON.stringify(json));
 }
 
+function clearVolume(context) {
+    console.log('timer fired', context);
+    if (context) {
+        var json = {
+            event: 'setTitle',
+            context: context,
+            payload: {
+                title: '',
+                target: DestinationEnum.HARDWARE_AND_SOFTWARE,
+            }
+        };
+        console.log("clearing volume ", json);
+        ws.send(JSON.stringify(json));
+    }
+}
+
 function showVolume(context, volume) {
+    if (timers[context]) {
+        clearTimeout(timers[context]);
+    }
+    timers[context] = setTimeout(() => clearVolume(context), 2000);
     console.log("showVolume", context, volume);
     if (context) {
         var json = {
@@ -119,6 +144,22 @@ function showPlayPause() {
     }
 }
 
+function showImage(context, image) {
+    if (context) {
+        var json = {
+            event: 'setImage',
+            context: context,
+            payload: {
+                image: image,
+                target: DestinationEnum.HARDWARE_AND_SOFTWARE,
+                state: 1,
+            }
+        };
+        console.log("setting image ", json);
+        ws.send(JSON.stringify(json));
+    }
+}
+
 function setVolume(volume) {
     console.log('setting volume', volume);
     console.log('emit volume', volume);
@@ -133,6 +174,27 @@ function setPlay() {
 function setStop() {
     console.log('emit stop');
     wsClient.emit('stop');
+}
+
+function updateImage(context, url) {
+    const absUrl = resolveRelative(url, `http://${volumioHostName}`);
+    console.log('fetching', url, 'from', absUrl);
+    jimp.read(absUrl, function(err, img) {
+        if (err) {
+            console.log('failed to fetch ', url);
+            console.log(err);
+        } else {
+            img.resize(72, 72).getBase64(jimp.AUTO, function(err, img64) {
+                if (err) {
+                    console.log('failed to resize image', url);
+                    console.log(err);
+                } else {
+                    showImage(context, img64);
+                    volumioAlbumArt = url;
+                }
+            });
+        }
+    });
 }
 
 function monitorStart() {
@@ -159,10 +221,16 @@ function monitorStart() {
 
     wsClient.on('pushState', function message(data) {
         console.log('received: %s', data);
+        if (data.volume !== volumioState?.volume) {
+            showVolume(contexts.VOLUME_UP, data.volume);
+            showVolume(contexts.VOLUME_DOWN, data.volume);
+            //showVolume(contexts.PLAY_PAUSE, data.volume);
+        }
+        if (data.albumart !== volumioAlbumArt) {
+            updateImage(contexts.PLAY_PAUSE, data.albumart);
+        }
         volumioState = data;
-        showVolume(contexts.VOLUME_UP, data.volume);
-        showVolume(contexts.VOLUME_DOWN, data.volume);
-        //showVolume(contexts.PLAY_PAUSE, data.volume);
+
         showPlayPause();
     });
 
@@ -198,7 +266,7 @@ ws.on('message', function (evt) {
     console.log('on message', jsonObj);
     if (jsonObj.event) {
         switch (jsonObj.event) {
-        case 'keyDown':
+        case 'keyUp':
             if (volumioState) {
                 console.log('volumioState', volumioState);
                 switch (jsonObj.action) {
@@ -226,12 +294,21 @@ ws.on('message', function (evt) {
             switch (jsonObj.action) {
                 case actions.VOLUME_DOWN:
                     contexts.VOLUME_DOWN = jsonObj.context;
+                    if (volumioState) {
+                        showVolume(contexts.VOLUME_DOWN, volumioState.volume);
+                    }
                     break;
                 case actions.VOLUME_UP:
                     contexts.VOLUME_UP = jsonObj.context;
+                    if (volumioState) {
+                        showVolume(contexts.VOLUME_UP, volumioState.volume);
+                    }
                     break;
                 case actions.PLAY_PAUSE:
                     contexts.PLAY_PAUSE = jsonObj.context;
+                    if (volumioAlbumArt) {
+                        updateImage(contexts.PLAY_PAUSE, volumioAlbumArt);
+                    }
                     break;
                 default:
                     console.log("Unknown context ", jsonObj);
@@ -243,9 +320,9 @@ ws.on('message', function (evt) {
                 monitorStart();
             }
             break;
-        case 'willDisappear':
-            monitorStop();
-            break;
+        // case 'willDisappear':
+        //     monitorStop();
+        //     break;
         case 'didReceiveSettings':
             volumioHostName = jsonObj.payload.settings.volumioHostName;
             monitorStart();
@@ -255,7 +332,9 @@ ws.on('message', function (evt) {
             if (jsonObj.payload?.volumioHostName && jsonObj.payload.volumioHostName !== volumioHostName) {
                 volumioHostName = jsonObj.payload.volumioHostName;
                 console.log('new service', volumioHostName);
-                setSettings(jsonObj.context);
+                if (contexts.PLAY_PAUSE) setSettings(contexts.PLAY_PAUSE);
+                if (contexts.VOLUME_DOWN) setSettings(contexts.VOLUME_DOWN);
+                if (contexts.VOLUME_UP) setSettings(contexts.VOLUME_UP);
                 monitorStart();
             }
             break;
@@ -269,5 +348,5 @@ if (debug) {
     ws.open()
     ws.message('{"event": "willAppear", "context": "--context--", "payload": {"settings":{"volumioHostName": "192.168.9.75"}}}');
     ws.message('{"event": "didReceiveSettings", "payload": {"settings":{"volumioHostName": "192.168.9.75"}}}');
-    setInterval(ws.message, 5000, '{"event":"keyDown", "context": "--context--"}');
+    setInterval(ws.message, 5000, '{"event": "keyDown", "action": "au.com.clearwater.volumio.playpause", "context": "--context--"}');
 }

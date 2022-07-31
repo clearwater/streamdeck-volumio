@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "ws": "^8.5.0",
-    "socket.io-client": "^1.7.4"
+    "socket.io-client": "^1.7.4",
+    "jimp": "^0.16.1",
+    "resolve-relative-url": "1.0.0"
   }
 }

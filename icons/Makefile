@@ -1,5 +1,5 @@
 FILES := pause.png play.png volumeDown.png volumeUp.png
-FOREGROUND := xc:purple 
+FOREGROUND := xc:\#3d6ee0
 BACKGROUND := xc:black
 all: $(FILES)
 
@@ -14,7 +14,7 @@ foreground.png:
 
 
 $(FILES): foreground.png background.png
-	convert original/$@ -negate mask.png
+	convert original/$@ -resize 72x72 -negate mask.png
 	convert foreground.png background.png   mask.png -composite $@
 
 install:
